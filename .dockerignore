@@ -1,0 +1,17 @@
+# Keep images smaller and builds faster by reducing context
+.git
+.gitignore
+.github
+.devcontainer
+.vscode
+build
+install
+log
+**/__pycache__/
+**/*.pyc
+*.log
+
+# Large binaries/artifacts that aren't needed to build the base image
+yolov*.pt
+*.pdf
+*.gv
