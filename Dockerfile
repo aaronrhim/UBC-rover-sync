@@ -1,34 +1,54 @@
-# syntax=docker/dockerfile:1
+# Build with 'docker compose build'
+# Create and enter container with 'docker compose run rover bash'
+# if you have anymore questions ask Aaron
 
-# Minimal base for RoverFlake2 development (ROS 2 Humble on Ubuntu 22.04)
-FROM ubuntu:22.04
+# official base image in docs
+FROM osrf/ros:humble-desktop
 
-# Noninteractive APT to avoid tzdata/locale prompts during install
+# consistency with setup files
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+ENV ROVERFLAKE_ROOT=/RoverFlake2
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
-# Install only the core tools our setup scripts rely on
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       sudo locales tzdata ca-certificates bash git curl \
-       software-properties-common \
+# install base depenencies (recommend not to change if you want to add niche deps)
+RUN apt-get update && apt-get install -y \
+    tzdata \
+    sudo \
+    curl \
+    git \
+    wget \
+    bash \
+    python3 \
+    python3-pip \
+    build-essential \
+    cmake \
+    python3-colcon-common-extensions \
+    ros-humble-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
-# Generate and export UTF-8 locale (expected by setup scripts)
-RUN locale-gen en_US.UTF-8 \
-    && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
+# common ROS package dockerdeps (use this for niche deps)
+RUN apt-get update && apt-get install -y \
+    ros-humble-urdf \
+    ros-humble-image-transport \
+    ros-humble-cv-bridge \
+    ros-humble-xacro \
+    ros-humble-rosidl-default-generators \
+    ros-humble-rosidl-default-runtime \
+    && rm -rf /var/lib/apt/lists/*
 
-# Put repo where scripts expect: $HOME/RoverFlake2 (root's HOME is /root)
-WORKDIR /root/RoverFlake2
+# copy root into container
+WORKDIR $ROVERFLAKE_ROOT
+COPY . $ROVERFLAKE_ROOT
 
-# Copy source so setup scripts are available inside the image
-COPY . .
+# run the full setup script (confirms everything including nested setup scripts)
+RUN yes | bash setup_scripts/setup_everything_common.sh
 
-# Default to an interactive shell; run setup scripts manually inside
-# Example:
-#   docker build -t roverflake2:dev .
-#   docker run --rm -it --net=host -e DISPLAY \
-#     -v /tmp/.X11-unix:/tmp/.X11-unix:rw roverflake2:dev
-#   bash setup_scripts/setup_everything_common.sh
-CMD ["bash"]
+# copy and set entrypoint (runs setup)
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# changed with COPY
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["/bin/bash"]
